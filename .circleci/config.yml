@@ -96,10 +96,14 @@ commands:
         type: string
     steps:
       - run:
-          name: "Build and Run Command in Docker: << parameters.command >>"
+          name: "Build Docker Image"
           command: |
             set -x
             docker build -t lucet .
+      - run:
+          name: "Run Command in Docker: << parameters.command >>"
+          command: |
+            set -x
             docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "<< parameters.command >>"
 
   ensure_sources_unchanged:
