@@ -25,7 +25,7 @@ test: indent-check test-packages
 
 .PHONY: test-packages
 test-packages:
-	cargo test --no-fail-fast --all $(CRATES_NOT_TESTED:%=--exclude %)
+	cargo test -vv --no-fail-fast --all $(CRATES_NOT_TESTED:%=--exclude %)
 
 .PHONY: test-full
 test-full: indent-check audit book test-ci test-benchmarks test-fuzz
@@ -34,11 +34,11 @@ test-full: indent-check audit book test-ci test-benchmarks test-fuzz
 # have found regressions in release mode due to optimizations in the past.
 .PHONY: test-release
 test-release:
-	cargo test --release --no-fail-fast --all --exclude $(CRATES_NOT_TESTED:%=--exclude %)
+	cargo test -vv --release --no-fail-fast --all --exclude $(CRATES_NOT_TESTED:%=--exclude %)
 
 .PHONY: test-release-executables
 test-release-executables:
-	cargo build --release -p lucetc -p lucet-wasi -p lucet-objdump
+	cargo build -vv --release -p lucetc -p lucet-wasi -p lucet-objdump
 	helpers/lucet-toolchain-tests/signature.sh release
 	helpers/lucet-toolchain-tests/objdump.sh release
 
