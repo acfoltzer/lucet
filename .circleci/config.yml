@@ -45,6 +45,8 @@ commands:
           steps:
             - restore_cache:
                 key: target_dir-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                key: target_dir-{{ .Branch }}-
+                key: target_dir-
       - build_container
       - make_in_container:
           target: test-full
