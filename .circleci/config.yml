@@ -44,9 +44,10 @@ commands:
           condition: << parameters.cache_target >>
           steps:
             - restore_cache:
-                key: target_dir-{{ .Branch }}-{{ checksum "Cargo.lock" }}
-                key: target_dir-{{ .Branch }}-
-                key: target_dir-
+                keys:
+                  - target_dir-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                  - target_dir-{{ .Branch }}-
+                  - target_dir-
       - build_container
       - make_in_container:
           target: test-full
