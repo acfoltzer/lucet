@@ -51,9 +51,7 @@ commands:
       - make_in_container:
           target: test-full
       - make_in_container:
-          target: test-release
-      - make_in_container:
-          target: test-release-executables
+          target: test-release test-release-executables
       - ensure_sources_unchanged
       - when:
           condition: << parameters.cache_target >>
