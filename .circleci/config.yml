@@ -1,120 +1,103 @@
 version: 2.1
 
 jobs:
-  run_in_container:
-    parameters:
-      command:
-        type: string
+  full_ci_branch:
     machine:
       image: "ubuntu-1604:202004-01"
       docker_layer_caching: true
     resource_class: large
     steps:
-      - checkout_recursively
-      - run_in_container_step:
-          command: << parameters.command >>
-      - ensure_sources_unchanged
+      - full_ci:
+          cache_target: true
 
-  rustfmt:
-    docker:
-      - image: "circleci/rust:1.43.1"
-    resource_class: small
+  full_ci_master:
+    machine:
+      image: "ubuntu-1604:202004-01"
+      docker_layer_caching: true
+    resource_class: large
     steps:
-      - checkout_recursively
-      - run:
-          name: Run rustfmt
-          command: |
-            set -x
-            make indent-check
-
-  cargo_audit:
-    docker:
-      - image: "circleci/rust:1.43.1"
-    resource_class: small
-    steps:
-      - checkout_recursively
-      - run:
-          name: Build and Run cargo-audit
-          command: |
-            set -x
-            cargo install --debug cargo-audit
-            cargo audit
-
-  docs:
-    docker:
-      - image: "circleci/rust:1.43.1"
-    resource_class: small
-    steps:
-      - checkout_recursively
-      - run:
-          name: Build Documentation
-          command: |
-            set -x
-            cargo install --debug mdbook
-            mdbook build docs
+      - full_ci:
+          cache_target: false
 
 workflows:
   build:
     jobs:
-      - run_in_container:
-          name: Test
-          command: make -C /lucet test-ci
-      - run_in_container:
-          name: Smoke Test Benchmarks
-          command: make -C /lucet test-benchmarks
-      - run_in_container:
-          name: Smoke Test Fuzz
-          command: make -C /lucet test-fuzz
-      - run_in_container:
-          name: Test Release
-          command: make -C /lucet test-release
-      - run_in_container:
-          name: Test Release Executables
-          command: make -C /lucet test-release-executables
-      - run_in_container:
-          name: Package
-          command: make -C /lucet test-release-executables
-      - rustfmt:
-          name: Rustfmt
-      - cargo_audit:
-          name: Cargo Audit
-      - docs:
-          name: Docs
+      - full_ci_branch:
+          filters:
+            branches:
+              ignore: master
+      - full_ci_master:
+          filters:
+            branches:
+              only: master
 
 commands:
+  full_ci:
+    description: "Run the full CI for Lucet"
+    parameters:
+      cache_target:
+        type: boolean
+        description: "If `true`, the target/ directory will be cached between builds"
+    steps:
+      - checkout_recursively
+      - when:
+          condition: << parameters.cache_target >>
+          steps:
+            - restore_cache:
+                key: target_dir-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+      - build_container
+      - make_in_container:
+          target: test-full
+      - make_in_container:
+          target: test-release
+      - make_in_container:
+          target: test-release-executables
+      - ensure_sources_unchanged
+      - when:
+          condition: << parameters.cache_target >>
+          steps:
+            - save_cache:
+                key: target_dir-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                paths:
+                  - "target"
+
   checkout_recursively:
     description: "Check out the git repository, and recursively initialize its submodules"
     steps:
       - checkout
       - run:
-          name: "Sync and Recursively Update Submodules"
+          name: "Sync and recursively update submodules"
           command: |
             set -x
             git submodule sync
             git submodule update --init --recursive
 
-  run_in_container_step:
-    description: "Build the Lucet development/CI Docker image, and then run a command in it"
-    parameters:
-      command:
-        type: string
+  build_container:
+    description: "Build the Lucet development/CI Docker image"
     steps:
       - run:
-          name: "Build Docker Image"
+          name: "Build Docker image"
           command: |
             set -x
             docker build -t lucet .
+
+  make_in_container:
+    description: Run a make target in the Lucet development/CI Docker image"
+    parameters:
+      target:
+        type: string
+    steps:
       - run:
-          name: "Run Command in Docker: << parameters.command >>"
+          name: "Run Make target in Docker: << parameters.target >>"
           command: |
             set -x
-            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "<< parameters.command >>"
+            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet << parameters.target >>"
 
   ensure_sources_unchanged:
     description: "Make sure that previous steps did not change the source files from git"
     steps:
       - run:
-          name: "Ensure Sources Are Unchanged"
+          name: "Ensure sources are unchanged"
           command: |
             set -x
             git diff --exit-code
